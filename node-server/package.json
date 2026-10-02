@@ -8,7 +8,8 @@
   "main": "app.js",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "nodemon src/app.js"
+    "dev": "nodemon src/app.js",
+    "seed:categories": "node src/scripts/seedCategories.js"
   },
   "dependencies": {
     "body-parser": "^2.2.2",
