@@ -1,40 +1,68 @@
 import express from "express";
-import { addExpense, EXPENSE_CATEGORIES } from "../services/sheetService.js";
+import {
+  createExpense, createTrip, deleteExpense, deleteTrip, EXPENSE_CATEGORIES,
+  getDashboard, listExpenses, listTrips, PAYMENT_METHODS, updateExpense, updateTrip,
+} from "../services/expenseService.js";
 
 const router = express.Router();
 
+function handleError(res, error) {
+  const clientError = /required|invalid|greater|cannot|not found|zero/.test(error.message);
+  return res.status(clientError ? 400 : 500).json({ error: error.message });
+}
+
+router.get("/meta", (req, res) => res.json({ categories: EXPENSE_CATEGORIES, paymentMethods: PAYMENT_METHODS }));
+
+router.post("/expenses", async (req, res) => {
+  try { res.status(201).json(await createExpense(req.body)); } catch (error) { handleError(res, error); }
+});
+
+router.get("/expenses", async (req, res) => {
+  try { res.json(await listExpenses(req.query)); } catch (error) { handleError(res, error); }
+});
+
+router.put("/expenses/:id", async (req, res) => {
+  try { res.json(await updateExpense(req.params.id, req.body)); } catch (error) { handleError(res, error); }
+});
+
+router.delete("/expenses/:id", async (req, res) => {
+  try { await deleteExpense(req.params.id); res.status(204).end(); } catch (error) { handleError(res, error); }
+});
+
+router.get("/dashboard", async (req, res) => {
+  try { res.json(await getDashboard(req.query.month || new Date().toISOString().slice(0, 7))); } catch (error) { handleError(res, error); }
+});
+
+router.get("/trips", async (req, res) => {
+  try { res.json(await listTrips()); } catch (error) { handleError(res, error); }
+});
+
+router.post("/trips", async (req, res) => {
+  try { res.status(201).json(await createTrip(req.body)); } catch (error) { handleError(res, error); }
+});
+
+router.put("/trips/:id", async (req, res) => {
+  try { res.json(await updateTrip(req.params.id, req.body)); } catch (error) { handleError(res, error); }
+});
+
+router.delete("/trips/:id", async (req, res) => {
+  try { await deleteTrip(req.params.id); res.status(204).end(); } catch (error) { handleError(res, error); }
+});
+
 router.post("/add-expense", async (req, res) => {
   try {
-    const { amount, date, category } = req.body;
-
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ message: "Invalid amount" });
-    }
-
-    if (!date) {
-      return res.status(400).json({ message: "Date required" });
-    }
-
-    if (!category || !EXPENSE_CATEGORIES.includes(category)) {
-      return res.status(400).json({ message: "Invalid category" });
-    }
-
-    const result = await addExpense(amount, date, category);
-
-    res.json({ message: result });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.json({ message: "Expense added", expense: await createExpense(req.body) });
+  } catch (error) {
+    handleError(res, error);
   }
 });
 
-import { getMonthlyExpenses } from "../services/sheetService.js";
-
 router.get("/month-expenses", async (req, res) => {
   try {
-    const data = await getMonthlyExpenses();
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const data = await getDashboard(new Date().toISOString().slice(0, 7));
+    res.json({ ...data, expenses: data.expenses.map((expense) => ({ ...expense, expense: expense.amount })) });
+  } catch (error) {
+    handleError(res, error);
   }
 });
 
