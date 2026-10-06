@@ -1,8 +1,10 @@
 import express from "express";
 import {
-  createCategory, createExpense, createRecurring, createTrip, deleteCategory, deleteExpense,
+  createCategory, createExpense, createMoneyLent, createRecurring, createTrip, deleteCategory, deleteExpense,
+  deleteMoneyLent,
   deleteRecurring, deleteTrip, generateRecurringExpenses, getDashboard, listCategories,
-  listExpenses, listRecurring, listTrips, PAYMENT_METHODS, updateCategory, updateExpense,
+  listExpenses, listMoneyLent, listRecurring, listTrips, markMoneyCollected, PAYMENT_METHODS, updateCategory, updateExpense,
+  updateMoneyLent,
   updateRecurring, updateTrip,
 } from "../services/expenseService.js";
 
@@ -25,6 +27,12 @@ router.post("/recurring", async (req, res) => { try { res.status(201).json(await
 router.put("/recurring/:id", async (req, res) => { try { res.json(await updateRecurring(req.userId, req.params.id, req.body)); } catch (error) { handleError(res, error); } });
 router.delete("/recurring/:id", async (req, res) => { try { await deleteRecurring(req.userId, req.params.id); res.status(204).end(); } catch (error) { handleError(res, error); } });
 router.post("/recurring/generate", async (req, res) => { try { res.json(await generateRecurringExpenses(req.userId)); } catch (error) { handleError(res, error); } });
+
+router.get("/money-lent", async (req, res) => { try { res.json(await listMoneyLent(req.userId, req.query)); } catch (error) { handleError(res, error); } });
+router.post("/money-lent", async (req, res) => { try { res.status(201).json(await createMoneyLent(req.userId, req.body)); } catch (error) { handleError(res, error); } });
+router.put("/money-lent/:id", async (req, res) => { try { res.json(await updateMoneyLent(req.userId, req.params.id, req.body)); } catch (error) { handleError(res, error); } });
+router.post("/money-lent/:id/collect", async (req, res) => { try { res.json(await markMoneyCollected(req.userId, req.params.id)); } catch (error) { handleError(res, error); } });
+router.delete("/money-lent/:id", async (req, res) => { try { await deleteMoneyLent(req.userId, req.params.id); res.status(204).end(); } catch (error) { handleError(res, error); } });
 
 router.post("/expenses", async (req, res) => {
   try { res.status(201).json(await createExpense(req.userId, req.body)); } catch (error) { handleError(res, error); }

@@ -56,11 +56,12 @@ async function collections() {
     trips: db.collection("trips"),
     categories: db.collection("categories"),
     recurring: db.collection("recurringExpenses"),
+    lent: db.collection("moneyLent"),
   };
 }
 
 export async function initializeDatabase() {
-  const { expenses, trips, categories, recurring } = await collections();
+  const { expenses, trips, categories, recurring, lent } = await collections();
   await expenses.createIndex({ date: -1 });
   await expenses.createIndex({ tripId: 1, date: -1 });
   await trips.createIndex({ startDate: -1 });
@@ -68,6 +69,7 @@ export async function initializeDatabase() {
   if (categoryIndexes.some((index) => index.name === "name_1")) await categories.dropIndex("name_1");
   await categories.createIndex({ userId: 1, name: 1 }, { unique: true, name: "user_category_unique" });
   await recurring.createIndex({ active: 1, nextRunDate: 1 });
+  await lent.createIndex({ userId: 1, status: 1, date: -1 });
   await expenses.createIndex(
     { recurringExpenseId: 1, date: 1 },
     { unique: true, name: "recurring_occurrence_unique", partialFilterExpression: { recurringExpenseId: { $type: "objectId" } } },
@@ -76,6 +78,58 @@ export async function initializeDatabase() {
   await trips.updateMany({ userId: { $exists: false } }, { $set: { userId: null } });
   await categories.updateMany({ userId: { $exists: false } }, { $set: { userId: null } });
   await recurring.updateMany({ userId: { $exists: false } }, { $set: { userId: null } });
+}
+
+function cleanLent(input) {
+  const person = String(input.person || "").trim().slice(0, 100);
+  const amount = Number(input.amount);
+  if (!person) throw new Error("Person name is required");
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error("Amount must be greater than zero");
+  if (!dateIsValid(input.date)) throw new Error("A valid date is required");
+  return {
+    person,
+    amount: Math.round(amount * 100) / 100,
+    date: input.date,
+    note: String(input.note || "").trim().slice(0, 240),
+    status: input.status === "collected" ? "collected" : "pending",
+    collectedAt: input.status === "collected" ? new Date() : null,
+  };
+}
+
+export async function listMoneyLent(userId, query = {}) {
+  const { lent } = await collections();
+  const filter = { userId: ownerId(userId) };
+  if (query.status === "pending" || query.status === "collected") filter.status = query.status;
+  return lent.find(filter).sort({ status: 1, date: -1, createdAt: -1 }).toArray();
+}
+
+export async function createMoneyLent(userId, input) {
+  const { lent } = await collections();
+  const userObjectId = ownerId(userId);
+  const record = { ...cleanLent(input), userId: userObjectId, createdAt: new Date(), updatedAt: new Date() };
+  const result = await lent.insertOne(record);
+  return lent.findOne({ _id: result.insertedId, userId: userObjectId });
+}
+
+export async function updateMoneyLent(userId, id, input) {
+  const { lent } = await collections();
+  const userObjectId = ownerId(userId);
+  const result = await lent.findOneAndUpdate({ _id: toId(id), userId: userObjectId }, { $set: { ...cleanLent(input), updatedAt: new Date() } }, { returnDocument: "after" });
+  if (!result) throw new Error("Lent money record not found");
+  return result;
+}
+
+export async function markMoneyCollected(userId, id) {
+  const { lent } = await collections();
+  const result = await lent.findOneAndUpdate({ _id: toId(id), userId: ownerId(userId) }, { $set: { status: "collected", collectedAt: new Date(), updatedAt: new Date() } }, { returnDocument: "after" });
+  if (!result) throw new Error("Lent money record not found");
+  return result;
+}
+
+export async function deleteMoneyLent(userId, id) {
+  const { lent } = await collections();
+  const result = await lent.deleteOne({ _id: toId(id), userId: ownerId(userId) });
+  if (!result.deletedCount) throw new Error("Lent money record not found");
 }
 
 export async function seedInitialCategories(userId) {
@@ -285,4 +339,38 @@ export async function generateRecurringExpenses(userId, today = new Date()) {
     await recurring.updateOne({ _id: rule._id, userId: userObjectId }, { $set: { nextRunDate: runDate, active: !rule.endDate || runDate <= rule.endDate, updatedAt: new Date() } });
   }
   return { created };
+}
+
+export async function generateRecurringExpensesForAllUsers(today = new Date()) {
+  const { recurring } = await collections();
+  const userIds = await recurring.distinct("userId", { active: true });
+  let created = 0;
+  for (const userId of userIds) {
+    if (!userId) continue;
+    created += (await generateRecurringExpenses(userId, today)).created;
+  }
+  return { users: userIds.filter(Boolean).length, created };
+}
+
+function millisecondsUntilNextRun(hour = 2) {
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(hour, 0, 0, 0);
+  if (next <= now) next.setDate(next.getDate() + 1);
+  return next.getTime() - now.getTime();
+}
+
+export function startRecurringExpenseJob() {
+  const run = async () => {
+    try {
+      const result = await generateRecurringExpensesForAllUsers();
+      console.log(`Recurring expense job completed: ${result.created} expense(s) generated for ${result.users} user(s).`);
+    } catch (error) {
+      console.error("Recurring expense job failed:", error.message);
+    } finally {
+      setTimeout(run, millisecondsUntilNextRun(Number(process.env.RECURRING_JOB_HOUR || 2)));
+    }
+  };
+
+  void run();
 }
