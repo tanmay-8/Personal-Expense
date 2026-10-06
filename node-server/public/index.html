@@ -71,12 +71,29 @@
         </div>
       </header>
       <nav class="tabs" aria-label="Main navigation">
-        <button class="tab active" data-view="dashboardView">Dashboard</button
-        ><button class="tab" data-view="expensesView">Expenses</button
-        ><button class="tab" data-view="tripsView">Trips</button
-        ><button class="tab" data-view="lentView">Money lent</button
-        ><button class="tab" data-view="recurringView">Recurring</button
-        ><button class="tab" data-view="categoriesView">Categories</button>
+        <button
+          class="tab active"
+          data-views="dashboardView"
+          data-mode="overview"
+        >
+          Overview</button
+        ><button class="tab" data-views="dailyView" data-mode="daily">
+          Daily</button
+        ><button
+          class="tab"
+          data-views="expensesView,lentView"
+          data-mode="activity"
+        >
+          Activity</button
+        ><button
+          class="tab"
+          data-views="tripsView,recurringView"
+          data-mode="plans"
+        >
+          Plans</button
+        ><button class="tab" data-views="categoriesView" data-mode="manage">
+          Manage
+        </button>
       </nav>
       <section class="hero">
         <div>
@@ -122,6 +139,8 @@
           <span class="pulse"></span
           ><span id="insight">Loading your spending insight...</span>
         </div>
+      </section>
+      <section class="view" id="dailyView">
         <div class="panel daily-panel">
           <div class="panel-head">
             <div>
@@ -130,11 +149,17 @@
                 >Select a day to inspect its transactions</span
               >
             </div>
-            <span class="subtle" id="dailyTotal"></span>
+            <span class="subtle" id="dailyTotalPage"></span>
           </div>
-          <div id="dailyList"></div>
+          <div id="dailyListPage"></div>
         </div>
       </section>
+      <div class="context-switch activity-switch" data-mode="activity">
+        <button class="context-tab active" data-subviews="expensesView">
+          Expenses
+        </button>
+        <button class="context-tab" data-subviews="lentView">Money lent</button>
+      </div>
       <section class="view" id="expensesView">
         <div class="panel">
           <div class="panel-head">
@@ -150,6 +175,14 @@
           <div id="expenseList"></div>
         </div>
       </section>
+      <div class="context-switch plans-switch" data-mode="plans">
+        <button class="context-tab active" data-subviews="tripsView">
+          Trips
+        </button>
+        <button class="context-tab" data-subviews="recurringView">
+          Recurring
+        </button>
+      </div>
       <section class="view" id="tripsView">
         <div class="panel">
           <div class="panel-head">

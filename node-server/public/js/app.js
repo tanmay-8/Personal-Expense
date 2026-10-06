@@ -103,10 +103,10 @@ function renderDaily(items) {
     }, {}),
     dates = Object.keys(grouped).sort().reverse(),
     total = items.reduce((sum, item) => sum + item.amount, 0);
-  $("dailyTotal").textContent = dates.length
+  $("dailyTotalPage").textContent = dates.length
     ? `${dates.length} active days · ${money(total)}`
     : "";
-  $("dailyList").innerHTML = dates.length
+  const dailyMarkup = dates.length
     ? dates
         .map((date) => {
           const dayItems = grouped[date],
@@ -117,6 +117,7 @@ function renderDaily(items) {
         })
         .join("")
     : '<div class="empty">No expenses recorded this month.</div>';
+  $("dailyListPage").innerHTML = dailyMarkup;
 }
 function showDayDetails(date, items) {
   const dayItems = items.filter((item) => item.date === date),
@@ -591,14 +592,45 @@ document.querySelectorAll(".tab").forEach(
       document
         .querySelectorAll(".tab")
         .forEach((item) => item.classList.toggle("active", item === tab));
-      document
-        .querySelectorAll(".view")
-        .forEach((view) =>
-          view.classList.toggle("active", view.id === tab.dataset.view),
+      document.querySelectorAll(".view").forEach((view) => {
+        const views = (tab.dataset.views || tab.dataset.view).split(",");
+        view.classList.toggle("active", views.includes(view.id));
+      });
+      document.querySelectorAll(".context-switch").forEach((switcher) => {
+        switcher.classList.toggle(
+          "active",
+          switcher.dataset.mode === tab.dataset.mode,
         );
+      });
+      if (tab.dataset.mode === "activity") activateSubViews("expensesView");
+      if (tab.dataset.mode === "plans") activateSubViews("tripsView");
+      if (tab.dataset.mode !== "activity") {
+        document
+          .querySelectorAll(".activity-switch .context-tab")
+          .forEach((button) => button.classList.remove("active"));
+      }
+      if (tab.dataset.mode !== "plans") {
+        document
+          .querySelectorAll(".plans-switch .context-tab")
+          .forEach((button) => button.classList.remove("active"));
+      }
       $("viewEyebrow").textContent = tab.textContent;
     }),
 );
+function activateSubViews(viewId) {
+  document.querySelectorAll(".context-tab").forEach((button) => {
+    const views = button.dataset.subviews.split(",");
+    const active = views.includes(viewId);
+    button.classList.toggle("active", active);
+    views.forEach((id) =>
+      document.getElementById(id)?.classList.toggle("active", active),
+    );
+  });
+}
+document.querySelectorAll(".context-tab").forEach((button) => {
+  button.onclick = () =>
+    activateSubViews(button.dataset.subviews.split(",")[0]);
+});
 document.addEventListener("click", (event) => {
   const day = event.target.closest("[data-day]")?.dataset.day;
   if (day)
